@@ -2,29 +2,30 @@
 param (
 	[string]$UCSM,
 	[string]$NTPServer = "pool.ntp.org",
+	[string]$Timezone = "America/Los_Angeles (Pacific Time)",
 	[string]$DNSDomain = "domain.local",
-	[string]$DNSPrimary = "192.168.250.5",
-	[string]$DNSSecondary = "192.168.250.6",
-	[string]$KVMIPPoolStart = "192.168.250.11",
-	[string]$KVMIPPoolEnd = "192.168.250.19",
-	[string]$KVMIPPoolMask = "255.255.255.0",
-	[string]$KVMIPPoolGateway = "192.168.250.1",
-	[string]$ISCSIAIPPoolStart = "192.168.251.11",
-	[string]$ISCSIAIPPoolEnd = "192.168.251.19",
-	[string]$ISCSIAIPPoolMask = "255.255.255.0",
+	[string]$DNSPrimary,
+	[string]$DNSSecondary,
+	[string]$KVMIPPoolStart,
+	[string]$KVMIPPoolEnd,
+	[string]$KVMIPPoolMask,
+	[string]$KVMIPPoolGateway,
+	[string]$ISCSIAIPPoolStart,
+	[string]$ISCSIAIPPoolEnd,
+	[string]$ISCSIAIPPoolMask,
 	[string]$ISCSIAIPPoolGateway,
-	[string]$ISCSIBIPPoolStart = "192.168.252.11",
-	[string]$ISCSIBIPPoolEnd = "192.168.252.19",
-	[string]$ISCSIBIPPoolMask = "255.255.255.0",
+	[string]$ISCSIBIPPoolStart,
+	[string]$ISCSIBIPPoolEnd,
+	[string]$ISCSIBIPPoolMask,
 	[string]$ISCSIBIPPoolGateway,
-	[string]$VlanMgmt = "10",
+	[string]$VlanMgmt,
 	[alias("VlanStorage")]
-	[string]$VlanStorageA = "101",
-	[string]$VlanStorageB = "102",
+	[string]$VlanStorageA,
+	[string]$VlanStorageB,
 	[alias("VlanMigration")]
-	[string]$VlanMigrationA = "101",
-	[string]$VlanMigrationB = "102",
-	[array]$VlanVm = ("10","11","12")
+	[string]$VlanMigrationA,
+	[string]$VlanMigrationB,
+	[array]$VlanVm
 )
 
 function Write-Log {
@@ -75,26 +76,38 @@ function Write-Log {
 	}
 }
 
+$LogOutTo = "Screen"
+
+$error.Clear()
 try {
-	Import-Module CiscoUcsPS
+	Import-Module Cisco.UCSManager -ErrorAction SilentlyContinue
 }catch{
-	Write-Log "Failed to load PS module" -Level "Error"
+	Write-Log "Failed to load PS module" -Level "Error" -OutTo $LogOutTo
+	break
+}
+
+if ($error){
+	Write-Log "Failed to load PS module" -Level "Error" -OutTo $LogOutTo
 	break
 }
 
 $error.Clear()
 Connect-Ucs $UCSM -Credential (Get-Credential) -ErrorAction SilentlyContinue
 if ($error){
-	Write-Log "Failed to connect to UCSM" -Level "Error"
-	Write-Log $error.Exception.Message -Level "Error"
+	Write-Log "Failed to connect to UCSM" -Level "Error" -OutTo $LogOutTo
+	Write-Log $error.Exception.Message -Level "Error" -OutTo $LogOutTo
 	break
 }
 
 #Set timezone
-Get-UcsTimezone | Set-UcsTimezone -Timezone "America/Los_Angeles (Pacific Time)" -Force
+if ($Timezone){
+	Get-UcsTimezone | Set-UcsTimezone -Timezone $Timezone -Force
+}
 
 #Set NTP Server
-Get-UcsTimezone | Add-UcsNtpServer -Name $NTPServer
+if ($NTPServer){
+	Get-UcsTimezone | Add-UcsNtpServer -Name $NTPServer
+}
 
 #Configure jumbo frames
 Set-UcsBestEffortQosClass -mtu 9216 -Force
@@ -119,6 +132,7 @@ Add-UcsScrubPolicy -org root -name FLEX-SCRUB -Desc "Scrub FlexFlash for SD inst
 
 #Server Pool Policy
 # Remove default server pool and create custom
+Get-UcsServerPool -Name default | Remove-UcsServerPool -Force
 $serverPool = Add-UcsServerPool ALL-SERVERS
 Add-UcsServerPoolPolicy -Name ALL-CHASSIS -Qualifier "all-chassis" -PoolDn $serverPool.Dn
 
@@ -217,25 +231,22 @@ Get-UcsUuidSuffixPool default | Remove-UcsUuidSuffixPool -Force
 Add-UcsUuidSuffixPool UUIDPOOL-DEFAULT
 Get-UcsUuidSuffixPool UUIDPOOL-DEFAULT | Add-UcsUuidSuffixBlock -From "0000-000000000001" -To "0000-000000000256"
 
-Get-UcsIpPool ext-mgmt | Remove-UcsIpPool -Force
+#Get-UcsIpPool ext-mgmt | Remove-UcsIpPool -Force
 #IP Pool (KVM)
-Add-UcsIpPool -Name IPPOOL-KVM -AssignmentOrder sequential
+Get-UcsOrg -Level root | Add-UcsIpPool -Name IPPOOL-KVM -AssignmentOrder sequential
 Get-UcsIpPool IPPOOL-KVM | Add-UcsIpPoolBlock -From $KVMIPPoolStart -To $KVMIPPoolEnd -DefGw $KVMIPPoolGateway -Subnet $KVMIPPoolMask -PrimDns $DNSPrimary -SecDns $DNSSecondary
-#Get-UcsIpPool IPPOOL-KVM | Set-UcsIpPool -AssignmentOrder sequential -Force
 
 Get-UcsIpPool iscsi-initiator-pool | Remove-UcsIpPool -Force
 #IP Pool (iSCSI A)
 if ($ISCSIAIPPoolStart){
-	Add-UcsIpPool -Name IPPOOL-ISCSI-A -AssignmentOrder sequential
+	Get-UcsOrg -Level root | Add-UcsIpPool -Name IPPOOL-ISCSI-A -AssignmentOrder sequential
 	Get-UcsIpPool IPPOOL-ISCSI-A | Add-UcsIpPoolBlock -From $ISCSIAIPPoolStart -To $ISCSIAIPPoolEnd -Subnet $ISCSIAIPPoolMask
-	#Get-UcsIpPool IPPOOL-ISCSI-A | Set-UcsIpPool -AssignmentOrder sequential -Force
 }
 
 #IP Pool (iSCSI B)
 if ($ISCSIBIPPoolStart){
-	Add-UcsIpPool -Name IPPOOL-ISCSI-B -AssignmentOrder sequential
+	Get-UcsOrg -Level root | Add-UcsIpPool -Name IPPOOL-ISCSI-B -AssignmentOrder sequential
 	Get-UcsIpPool IPPOOL-ISCSI-B | Add-UcsIpPoolBlock -From $ISCSIBIPPoolStart -To $ISCSIBIPPoolEnd -Subnet $ISCSIBIPPoolMask
-	#Get-UcsIpPool IPPOOL-ISCSI-B | Set-UcsIpPool -AssignmentOrder sequential -Force
 }
 
 #IQN Pool
@@ -248,6 +259,8 @@ if ($ISCSIAIPPoolStart){
 }
 
 #Need to dynamically create MAC ranges
+Get-UcsMacPool -Name default | Remove-UcsMacPool -Force
+
 #MAC Pool Fab A ESXi
 Add-UcsMacPool -Name MAC-ESX-A -Descr "Fab A ESXi" -AssignmentOrder sequential
 Get-UcsMacPool -Name MAC-ESX-A | Add-UcsMacMemberBlock -From "00:25:B5:A1:10:00" -To "00:25:B5:A1:10:7F"
@@ -278,6 +291,7 @@ Get-UcsMacPool -Name MAC-LINUX-B | Add-UcsMacMemberBlock -From "00:25:B5:B1:40:0
 
 
 #ESXi vNIC Templates
+#Mgmt vNICs
 $vnic = Add-UcsVnicTemplate -Name ESX-MGMT-A -TemplType updating-template -SwitchId A -Target adaptor
 $vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-A -NwCtrlPolicyName ENABLE-CDP-LLDP -Force
 $vnic | Add-UcsVnicInterface -Name $VlanMgmt
@@ -285,20 +299,36 @@ $vnic = Add-UcsVnicTemplate -Name ESX-MGMT-B -TemplType updating-template -Switc
 $vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-B -NwCtrlPolicyName ENABLE-CDP-LLDP -Force
 $vnic | Add-UcsVnicInterface -Name $VlanMgmt
 
-$vnic = Add-UcsVnicTemplate -Name ESX-ISCSI-A -TemplType updating-template -SwitchId A -Target adaptor
-$vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-A -NwCtrlPolicyName ENABLE-CDP-LLDP -Mtu 9000 -Force
-$vnic | Add-UcsVnicInterface -Name $VlanStorageA
-$vnic = Add-UcsVnicTemplate -Name ESX-ISCSI-B -TemplType updating-template -SwitchId B -Target adaptor
-$vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-B -NwCtrlPolicyName ENABLE-CDP-LLDP -Mtu 9000 -Force
-$vnic | Add-UcsVnicInterface -Name $VlanStorageB
+#iSCSI vNICs
+if ($VlanStorageA){
+	$vnic = Add-UcsVnicTemplate -Name ESX-ISCSI-A -TemplType updating-template -SwitchId A -Target adaptor
+	$vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-A -NwCtrlPolicyName ENABLE-CDP-LLDP -Mtu 9000 -Force
+	$vnic | Add-UcsVnicInterface -Name $VlanStorageA
 
-$vnic = Add-UcsVnicTemplate -Name ESX-MIGRATION-A -TemplType updating-template -SwitchId A -Target adaptor
-$vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-A -NwCtrlPolicyName ENABLE-CDP-LLDP -Mtu 9000 -Force
-$vnic | Add-UcsVnicInterface -Name $VlanMigrationA
-$vnic = Add-UcsVnicTemplate -Name ESX-MIGRATION-B -TemplType updating-template -SwitchId B -Target adaptor
-$vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-B -NwCtrlPolicyName ENABLE-CDP-LLDP -Mtu 9000 -Force
-$vnic | Add-UcsVnicInterface -Name $VlanMigrationB
+	$vnic = Add-UcsVnicTemplate -Name ESX-ISCSI-B -TemplType updating-template -SwitchId B -Target adaptor
+	$vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-B -NwCtrlPolicyName ENABLE-CDP-LLDP -Mtu 9000 -Force
+	if ($VlanStorageB){
+		$vnic | Add-UcsVnicInterface -Name $VlanStorageB
+	}else{
+		$vnic | Add-UcsVnicInterface -Name $VlanStorageA
+	}
+}
 
+#vMotion vNICs
+if ($VlanMigrationA){
+	$vnic = Add-UcsVnicTemplate -Name ESX-MIGRATION-A -TemplType updating-template -SwitchId A -Target adaptor
+	$vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-A -NwCtrlPolicyName ENABLE-CDP-LLDP -Mtu 9000 -Force
+	$vnic | Add-UcsVnicInterface -Name $VlanMigrationA
+	$vnic = Add-UcsVnicTemplate -Name ESX-MIGRATION-B -TemplType updating-template -SwitchId B -Target adaptor
+	$vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-B -NwCtrlPolicyName ENABLE-CDP-LLDP -Mtu 9000 -Force
+	if ($VlanMigrationB){
+		$vnic | Add-UcsVnicInterface -Name $VlanMigrationB
+	}else{
+		$vnic | Add-UcsVnicInterface -Name $VlanMigrationA
+	}
+}
+
+#VM vNICs
 $vnic = Add-UcsVnicTemplate -Name ESX-VM1-A -TemplType updating-template -SwitchId A -Target adaptor
 $vnic | Set-UcsVnicTemplate -IdentPoolName MAC-ESX-A -NwCtrlPolicyName ENABLE-CDP-LLDP -Force
 foreach ($vlan in $VmVlans){
@@ -310,3 +340,4 @@ foreach ($vlan in $VmVlans){
 	$vnic | Add-UcsVnicInterface -Name $vlan.Name
 }
 
+Disconnect-Ucs
