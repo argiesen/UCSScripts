@@ -79,15 +79,11 @@ function Write-Log {
 $LogOutTo = "Screen"
 
 $error.Clear()
-try {
-	Import-Module Cisco.UCSManager -ErrorAction SilentlyContinue
-}catch{
-	Write-Log "Failed to load PS module" -Level "Error" -OutTo $LogOutTo
-	break
-}
+Import-Module Cisco.UCSManager -ErrorAction SilentlyContinue
 
 if ($error){
 	Write-Log "Failed to load PS module" -Level "Error" -OutTo $LogOutTo
+	Write-Log $error.Exception.Message -Level "Error" -OutTo $LogOutTo
 	break
 }
 
