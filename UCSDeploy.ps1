@@ -170,23 +170,23 @@ $VmVlans = @()
 #VM VLANs
 foreach ($vmVlan in $VlanVm){
 	$vlan = "" | select Name,Id
-	$vlan.Name = "VLAN-$vmVlan"
+	$vlan.Name = $vmVlan
 	$vlan.Id = $vmVlan
 	$VmVlans += $vlan
 }
 $GlobalVlans += $VmVlans
 #MGMT VLAN
 $vlan = "" | select Name,Id
-$vlan.Name = "VLAN-MGMT"
+$vlan.Name = "MGMT"
 $vlan.Id = $VlanMgmt
 $GlobalVlans += $vlan
 #Storage A VLAN
 if ($VlanStorageA){
 	$vlan = "" | select Name,Id
 	if ($VlanStorageB){
-		$vlan.Name = "VLAN-STORAGE-A"
+		$vlan.Name = "STORAGE-A"
 	}else{
-		$vlan.Name = "VLAN-STORAGE"
+		$vlan.Name = "STORAGE"
 	}
 	$vlan.Id = $VlanStorageA
 	$GlobalVlans += $vlan
@@ -194,7 +194,7 @@ if ($VlanStorageA){
 #Storage B VLAN
 if ($VlanStorageB){
 	$vlan = "" | select Name,Id
-	$vlan.Name = "VLAN-STORAGE-B"
+	$vlan.Name = "STORAGE-B"
 	$vlan.Id = $VlanStorageB
 	$GlobalVlans += $vlan
 }
@@ -202,9 +202,9 @@ if ($VlanStorageB){
 if ($VlanMigrationA){
 	$vlan = "" | select Name,Id
 	if ($VlanMigrationB){
-		$vlan.Name = "VLAN-MIGRATION-A"
+		$vlan.Name = "MIGRATION-A"
 	}else{
-		$vlan.Name = "VLAN-MIGRATION-B"
+		$vlan.Name = "MIGRATION"
 	}
 	$vlan.Id = $VlanMigrationA
 	$GlobalVlans += $vlan
@@ -212,7 +212,7 @@ if ($VlanMigrationA){
 #Migration B VLAN
 if ($VlanMigrationB){
 	$vlan = "" | select Name,Id
-	$vlan.Name = "VLAN-MIGRATION-B"
+	$vlan.Name = "MIGRATION-B"
 	$vlan.Id = $VlanMigrationB
 	$GlobalVlans += $vlan
 }
