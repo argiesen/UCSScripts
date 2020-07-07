@@ -42,11 +42,11 @@ function Write-Log {
 		[switch]$Clobber,
 		[switch]$NoNewLine
 	)
-	
+
 	if (!($LogPath)){
 		$LogPath = "$($env:ComputerName)-$(Get-Date -f yyyyMMdd).log"
 	}
-	
+
 	$msg = "{0} : {1} : {2}{3}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Level.ToUpper(), ("  " * $Indent), $Message
 	if ($OutTo -match "File"){
 		if (($Level -ne "Verb") -or ($VerbosePreference -eq "Continue")){
@@ -57,7 +57,7 @@ function Write-Log {
 			}
 		}
 	}
-	
+
 	$msg = "{0}{1}" -f ("  " * $Indent), $Message
 	if ($OutTo -match "Screen"){
 		switch ($Level){
@@ -169,20 +169,20 @@ $GlobalVlans = @()
 $VmVlans = @()
 #VM VLANs
 foreach ($vmVlan in $VlanVm){
-	$vlan = "" | select Name,Id
+	$vlan = "" | Select-Object Name,Id
 	$vlan.Name = $vmVlan
 	$vlan.Id = $vmVlan
 	$VmVlans += $vlan
 }
 $GlobalVlans += $VmVlans
 #MGMT VLAN
-$vlan = "" | select Name,Id
+$vlan = "" | Select-Object Name,Id
 $vlan.Name = "MGMT"
 $vlan.Id = $VlanMgmt
 $GlobalVlans += $vlan
 #Storage A VLAN
 if ($VlanStorageA){
-	$vlan = "" | select Name,Id
+	$vlan = "" | Select-Object Name,Id
 	if ($VlanStorageB){
 		$vlan.Name = "STORAGE-A"
 	}else{
@@ -193,14 +193,14 @@ if ($VlanStorageA){
 }
 #Storage B VLAN
 if ($VlanStorageB){
-	$vlan = "" | select Name,Id
+	$vlan = "" | Select-Object Name,Id
 	$vlan.Name = "STORAGE-B"
 	$vlan.Id = $VlanStorageB
 	$GlobalVlans += $vlan
 }
 #Migration A VLAN
 if ($VlanMigrationA){
-	$vlan = "" | select Name,Id
+	$vlan = "" | Select-Object Name,Id
 	if ($VlanMigrationB){
 		$vlan.Name = "MIGRATION-A"
 	}else{
@@ -211,7 +211,7 @@ if ($VlanMigrationA){
 }
 #Migration B VLAN
 if ($VlanMigrationB){
-	$vlan = "" | select Name,Id
+	$vlan = "" | Select-Object Name,Id
 	$vlan.Name = "MIGRATION-B"
 	$vlan.Id = $VlanMigrationB
 	$GlobalVlans += $vlan
